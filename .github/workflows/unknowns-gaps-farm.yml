@@ -1,0 +1,75 @@
+name: CEREBRON Farm 39 Unknowns Gaps
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  agents:
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - {index: 1, role: UNKNOWN_CLASSIFIER, model: huggingface-projects/llama-3.2-3B-Instruct}
+          - {index: 2, role: EVIDENCE_GAP_HUNTER, model: huggingface-projects/gemma-2-9b-it}
+          - {index: 3, role: MISSING_DATA_AUDITOR, model: huggingface-projects/llama-3.2-3B-Instruct}
+          - {index: 4, role: HIDDEN_ASSUMPTION_AUDITOR, model: huggingface-projects/gemma-2-9b-it}
+          - {index: 5, role: UNMEASURED_VARIABLE_SPECIALIST, model: huggingface-projects/llama-3.2-3B-Instruct}
+          - {index: 6, role: VALIDITY_BOUNDARY_AUDITOR, model: huggingface-projects/gemma-2-9b-it}
+          - {index: 7, role: DEPENDENCY_GAP_ANALYST, model: huggingface-projects/llama-3.2-3B-Instruct}
+          - {index: 8, role: DEFINITION_GAP_AUDITOR, model: huggingface-projects/gemma-2-9b-it}
+          - {index: 9, role: UNCERTAINTY_DECOMPOSER, model: huggingface-projects/llama-3.2-3B-Instruct}
+          - {index: 10, role: OBSERVABILITY_AUDITOR, model: huggingface-projects/gemma-2-9b-it}
+          - {index: 11, role: IDENTIFIABILITY_AUDITOR, model: huggingface-projects/llama-3.2-3B-Instruct}
+          - {index: 12, role: COVERAGE_GAP_ANALYST, model: huggingface-projects/gemma-2-9b-it}
+          - {index: 13, role: SCALE_GAP_SPECIALIST, model: huggingface-projects/llama-3.2-3B-Instruct}
+          - {index: 14, role: TEMPORAL_GAP_ANALYST, model: huggingface-projects/gemma-2-9b-it}
+          - {index: 15, role: CAUSAL_GAP_AUDITOR, model: huggingface-projects/llama-3.2-3B-Instruct}
+          - {index: 16, role: REPLICATION_GAP_AUDITOR, model: huggingface-projects/gemma-2-9b-it}
+          - {index: 17, role: UNKNOWN_UNKNOWN_SCOUT, model: huggingface-projects/llama-3.2-3B-Instruct}
+          - {index: 18, role: MINIMAL_TEST_DESIGNER, model: huggingface-projects/gemma-2-9b-it}
+          - {index: 19, role: GAP_PRIORITY_ANALYST, model: huggingface-projects/llama-3.2-3B-Instruct}
+          - {index: 20, role: OMEGA_UNKNOWNS_GAPS_JUDGE, model: huggingface-projects/gemma-2-9b-it}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: pip install -q hf-gradio
+      - name: External model inference
+        env:
+          ROLE: ${{ matrix.role }}
+          MODEL: ${{ matrix.model }}
+          INDEX: ${{ matrix.index }}
+        run: python worker/agent.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: farm39-${{ matrix.role }}
+          path: result.json
+  omega:
+    if: always()
+    needs: agents
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: farm39-*
+          path: rows
+          merge-multiple: false
+      - name: Build Omega packet
+        run: |
+          python - <<'PY'
+          import json,glob,pathlib
+          rows=[]
+          for f in glob.glob('rows/**/result.json',recursive=True):
+              try: rows.append(json.load(open(f)))
+              except Exception as e: rows.append({'status':'ARTIFACT_PARSE_FAILED','file':f,'error':str(e),'inference_success':False})
+          ok=[r for r in rows if r.get('inference_success') is True and r.get('status')=='UNREVIEWED_EXTERNAL_AGENT_OUTPUT']
+          packet={'farm':39,'mission':'Unknowns & Gaps','roles_returned':len(rows),'successful_external_ai_calls':len(ok),'failed_external_ai_calls':len(rows)-len(ok),'status':'UNREVIEWED_EXTERNAL_AGENT_OUTPUT','rules':['CLAIM<=EVIDENCE','UNKNOWN REMAINS UNKNOWN','ABSENCE OF EVIDENCE != EVIDENCE OF ABSENCE','SIMULATION!=TEST'],'rows':rows}
+          pathlib.Path('packet.json').write_text(json.dumps(packet,ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unknowns-gaps-farm-39-omega-packet
+          path: packet.json
