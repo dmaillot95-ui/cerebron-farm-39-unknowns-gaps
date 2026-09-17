@@ -1,4 +1,5 @@
 import hashlib,json,os,pathlib,subprocess
+from registry_loader import load_context
 PREFERRED=['/generate','/chat','/predict','/respond','/infer','/run']
 def run(cmd,timeout=240): return subprocess.run(cmd,capture_output=True,text=True,timeout=timeout)
 def payload_for(spec,prompt):
@@ -39,7 +40,11 @@ def invoke(space,prompt):
   errors.append((ep,(pred.stderr or pred.stdout)[-2000:]))
  return False,'',{'errors':errors}
 role=os.environ['ROLE']; model=os.environ['MODEL']; idx=os.environ.get('INDEX','0')
-prompt=f'''You are FARM 39 role {role}. Identify unknowns, evidence gaps, unmeasured variables, hidden assumptions, missing data, validity boundaries and unresolved dependencies. Do not fabricate missing information. Distinguish UNKNOWN, UNCERTAIN, CONTRADICTORY, UNMEASURED and UNDEFINED. For each important gap state: target claim/system, gap type, why it matters, evidence currently available, what is missing, dependencies, uncertainty, minimal decisive test/data, priority, and epistemic status. CLAIM<=EVIDENCE. UNKNOWN REMAINS UNKNOWN. ABSENCE OF EVIDENCE != EVIDENCE OF ABSENCE. SIMULATION!=TEST.'''
+registry_context,registry_meta=load_context(['constitution','macrograins','disciplines','keys','banks'])
+prompt=f'''You are FARM 39 role {role}. Identify unknowns, evidence gaps, unmeasured variables, hidden assumptions, missing data, validity boundaries and unresolved dependencies. Do not fabricate missing information. Distinguish UNKNOWN, UNCERTAIN, CONTRADICTORY, UNMEASURED and UNDEFINED. For each important gap state: target claim/system, gap type, why it matters, evidence currently available, what is missing, dependencies, uncertainty, minimal decisive test/data, priority, and epistemic status. CLAIM<=EVIDENCE. UNKNOWN REMAINS UNKNOWN. ABSENCE OF EVIDENCE != EVIDENCE OF ABSENCE. SIMULATION!=TEST.
+
+CENTRAL C42 GUIDANCE (not self-certifying):
+{registry_context}'''
 ok,text,meta=invoke(model,prompt)
-out={'farm':39,'role':role,'index':idx,'model':model,'inference_success':ok,'status':'UNREVIEWED_EXTERNAL_AGENT_OUTPUT' if ok else 'EXTERNAL_INFERENCE_FAILED','output':text if ok else '', 'meta':meta}
+out={'farm':39,'role':role,'index':idx,'model':model,'inference_success':ok,'status':'UNREVIEWED_EXTERNAL_AGENT_OUTPUT' if ok else 'EXTERNAL_INFERENCE_FAILED','output':text if ok else '', 'meta':meta,'registry_runtime':registry_meta}
 pathlib.Path('result.json').write_text(json.dumps(out,ensure_ascii=False,indent=2))
